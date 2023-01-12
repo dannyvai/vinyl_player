@@ -55,6 +55,6 @@ for i,image in enumerate(images[::-1]):
     big_image[total_y_shifts:480+total_y_shifts,total_windows:total_windows+640] += image/3
     total_y_shifts += y_shifts[num_images-i-1]
     total_windows += windows[num_images-i-1]
-
+# cv2.imwrite("artifacts/stitched_image.png", big_image)
 plt.imshow(big_image.astype('uint8'))
 plt.show()
