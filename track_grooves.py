@@ -106,25 +106,30 @@ def smooth_signal(signal_: np.ndarray) -> np.ndarray:
 
 
 selected_groove_idx = 4
-num_images = 10
+num_images = 589
 first_image_idx = 11
 first_image = load_flipped_image("audio_images/img_{:04d}.png".format(first_image_idx))
 signals = get_connected_components(first_image, debug=False)
 selected_signal = signals[selected_groove_idx][0]
 t_start_px = 0
 dt_pixel = 640
+generate_debug_plots = False
+debug = False
 
-# plt.figure()
-# plt.imshow(first_image, cmap='gray')
-# plt.plot(selected_signal, label="selected_signal")
-# plt.legend()
-# plt.show()
+if debug:
+    plt.figure()
+    plt.imshow(first_image, cmap='gray')
+    plt.plot(selected_signal, label="selected_signal")
+    plt.legend()
+    plt.show()
 
-dxs = [0]
-dys = [0]
-tops_arr = []
-bottoms_arr = []
-signals = [selected_signal]
+
+if generate_debug_plots:
+    dxs = [0]
+    dys = [0]
+    tops_arr = []
+    bottoms_arr = []
+    signals = [selected_signal]
 left_image = first_image
 for i in range(first_image_idx+1, first_image_idx + num_images):
     right_image = load_flipped_image("audio_images/img_{:04d}.png".format(i))
@@ -134,80 +139,98 @@ for i in range(first_image_idx+1, first_image_idx + num_images):
     selected_signal = combine_signals(selected_signal, new_signal, t_start_px, dx, dy)
     left_image = right_image
     t_start_px += dx
-    dxs.append(dx)
-    dys.append(dy)
-    tops_arr.append(tops)
-    bottoms_arr.append(bottoms)
-    signals.append((tops+bottoms)/2)
-    # plt.figure()
-    # plt.imshow(right_image, cmap='gray')
-    # plt.plot(tops, label="tops")
-    # plt.plot(bottoms, label="bottom")
-    # plt.plot(new_signal, label="new_signal")
-    # plt.plot(selected_signal[-640:], label="selected_signal")
-    # plt.legend()
-    # plt.show()
+    if generate_debug_plots:
+        dxs.append(dx)
+        dys.append(dy)
+        tops_arr.append(tops)
+        bottoms_arr.append(bottoms)
+        #signals.append((tops+bottoms)/2)
+        signals.append(new_signal)
 
+    if debug:
+        plt.figure()
+        plt.imshow(right_image, cmap='gray')
+        plt.plot(tops, label="tops")
+        plt.plot(bottoms, label="bottom")
+        plt.plot(new_signal, label="new_signal")
+        plt.plot(selected_signal[-640:], label="selected_signal")
+        plt.legend()
+        plt.show()
 
-"""
-Stitch the images
-"""
-big_image = np.zeros((480+int(np.sum(np.abs(dys))),640+int(np.sum(dxs))), dtype='float64')
-total_y_shifts = np.sum(np.abs(dys))
-total_windows = 0
-stitched_signal = np.zeros((num_images, 640+int(np.sum(dxs))), dtype='float64') + np.nan
-for i in range(first_image_idx, first_image_idx + num_images):
-    print(i)
-    print(dxs[i-first_image_idx], dys[i-first_image_idx])
-    print(total_windows, total_y_shifts)
-    image = load_flipped_image("audio_images/img_{:04d}.png".format(i))
+if generate_debug_plots:
+    """
+    Stitch the images
+    """
+    big_image = np.zeros((480+int(np.sum(np.abs(dys))),640+int(np.sum(dxs))), dtype='float64')
+    total_y_shifts = np.sum(np.abs(dys))
+    total_windows = 0
+    stitched_signal = np.zeros((num_images, 640+int(np.sum(dxs))), dtype='float64') + np.nan
+    for i in range(first_image_idx, first_image_idx + num_images):
+        print(i, dxs[i-first_image_idx], dys[i-first_image_idx],total_windows, total_y_shifts)
+        image = load_flipped_image("audio_images/img_{:04d}.png".format(i))
 
-    if image is None:
-        print(num_images-i, "image is not valid")
-        continue
-    total_y_shifts += dys[i-first_image_idx]
-    total_windows += dxs[i-first_image_idx]
-    big_image[total_y_shifts:480+total_y_shifts, total_windows:total_windows+640] += image/3
-    stitched_signal[i-first_image_idx, total_windows:total_windows+640] = signals[i-first_image_idx] + total_y_shifts
-stitched_signal = np.nanmean(stitched_signal, axis=0)
-"""
-Stitch the tops and bottoms lines
-"""
-total_y_shifts = np.sum(np.abs(dys))
-total_windows = 0
-tops_ndarray = np.zeros((num_images-1, big_image.shape[1])) + np.nan
-bottoms_ndarray = np.zeros((num_images-1, big_image.shape[1])) + np.nan
+        if image is None:
+            print(num_images-i, "image is not valid")
+            continue
+        total_y_shifts += dys[i-first_image_idx]
+        total_windows += dxs[i-first_image_idx]
+        print(total_windows+640)
+        big_image[total_y_shifts:480+total_y_shifts, total_windows:total_windows+640] += image/3
 
-for i in range(first_image_idx+1, first_image_idx + num_images):
-    total_y_shifts += dys[i-first_image_idx]
-    total_windows += dxs[i-first_image_idx]
-    tops_ndarray[i-first_image_idx-1, total_windows:total_windows+640] = tops_arr[i-first_image_idx-1] + total_y_shifts
-    bottoms_ndarray[i-first_image_idx-1, total_windows:total_windows+640] = bottoms_arr[i-first_image_idx-1] + total_y_shifts
-tops_ndarray = np.nanmean(tops_ndarray, axis=0)
-bottoms_ndarray = np.nanmean(bottoms_ndarray, axis=0)
+        stitched_signal[i-first_image_idx, total_windows:total_windows+640] = signals[i-first_image_idx] + total_y_shifts
 
-"""
-Plot the stitched images with the top and bottom selected groove lines
-"""
-total_y_shifts = np.sum(np.abs(dys))
-fig = plt.figure(figsize=(big_image.shape[1]//100, big_image.shape[0]//100), dpi=100)
-plt.imshow(big_image)
-plt.plot(tops_ndarray, label="top")
-plt.plot(bottoms_ndarray, label="bottom")
-plt.plot(stitched_signal, label="signal")
-plt.legend()
-plt.savefig("artifacts/groove_tracking.png")
-plt.close(fig)
+    stitched_signal = np.nanmean(stitched_signal, axis=0)
+    cv2.imwrite(f"artifacts/stitched_image_{first_image_idx}_{first_image_idx + num_images}.png", big_image)
 
+    """
+    Stitch the tops and bottoms lines
+    """
+    total_y_shifts = np.sum(np.abs(dys))
+    total_windows = 0
+    tops_ndarray = np.zeros((num_images-1, big_image.shape[1])) + np.nan
+    bottoms_ndarray = np.zeros((num_images-1, big_image.shape[1])) + np.nan
 
-cv2.imwrite("artifacts/stitched_image.png", big_image)
-#
+    for i in range(first_image_idx+1, first_image_idx + num_images):
+        total_y_shifts += dys[i-first_image_idx]
+        total_windows += dxs[i-first_image_idx]
+        tops_ndarray[i-first_image_idx-1, total_windows:total_windows+640] = tops_arr[i-first_image_idx-1] + total_y_shifts
+        bottoms_ndarray[i-first_image_idx-1, total_windows:total_windows+640] = bottoms_arr[i-first_image_idx-1] + total_y_shifts
+    tops_ndarray = np.nanmean(tops_ndarray, axis=0)
+    bottoms_ndarray = np.nanmean(bottoms_ndarray, axis=0)
 
-# fixed_signal = smooth_signal(selected_signal)
-# save_signal_as_wave(fixed_signal[::-1].astype(np.uint8), f"line_{selected_groove_idx}.wav")
-#
-# plt.figure()
-# plt.plot(selected_signal)
-# plt.plot(fixed_signal)
-#
-# plt.show()
+    """
+    Plot the stitched images with the top and bottom selected groove lines
+    """
+    total_y_shifts = np.sum(np.abs(dys))
+    fig = plt.figure(figsize=(150, 30), dpi=100)
+    plt.imshow(big_image)
+    plt.plot(tops_ndarray, label="top")
+    plt.plot(bottoms_ndarray, label="bottom")
+    plt.plot(stitched_signal, label="stitched_signal")
+    plt.plot(selected_signal, label="selected_signal")
+    plt.legend()
+    plt.savefig(f"artifacts/groove_tracking_{first_image_idx}_{first_image_idx + num_images}.png")
+    plt.close(fig)
+
+    print("stitched_signal.shape",stitched_signal.shape)
+    print("selected_signal.shape", selected_signal.shape)
+
+    stitched_signal = remove_slope(stitched_signal)
+    fixed_signal = smooth_signal(stitched_signal)
+    save_signal_as_wave(fixed_signal[::-1].astype(np.uint8), f"line_{selected_groove_idx}_stitched.wav")
+
+    plt.figure()
+    plt.plot(stitched_signal)
+    plt.plot(fixed_signal)
+
+    plt.show()
+
+selected_signal = remove_slope(selected_signal)
+fixed_signal = smooth_signal(selected_signal)
+save_signal_as_wave(fixed_signal[::-1].astype(np.uint8), f"line_{selected_groove_idx}.wav")
+
+plt.figure()
+plt.plot(selected_signal)
+plt.plot(fixed_signal)
+
+plt.show()

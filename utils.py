@@ -85,11 +85,11 @@ def get_image_shifts(img2, img1, debug=False):
 
 
 def combine_signals(selected_signal, new_signal, t_start_px, dx, dy):
-    combined_signal_length = selected_signal.shape[0] + (new_signal.shape[0] - dx)
+    combined_signal_length = selected_signal.shape[0] + dx
     print("combine_signals")
     print(selected_signal.shape,new_signal.shape,dx,combined_signal_length)
     combined_signal = np.zeros((2, combined_signal_length)) + np.nan
-    combined_signal[0, :selected_signal.shape[0]] = selected_signal
+    combined_signal[0, :selected_signal.shape[0]] = selected_signal - dy
     combined_signal[1, -new_signal.shape[0]:] = new_signal
     return np.nanmean(combined_signal, axis=0)
 
