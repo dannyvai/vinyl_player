@@ -132,3 +132,6 @@ dmypy.json
 
 .idea
 audio_images
+*.wav
+tmp/
+vinyl_images/
